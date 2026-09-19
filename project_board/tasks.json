@@ -1,0 +1,341 @@
+{
+  "version": 1,
+  "updated_at": "2026-09-19T13:18:58.531Z",
+  "tasks": [
+    {
+      "id": "OTR-001",
+      "title": "Set up the shared project repository",
+      "status": "done",
+      "priority": "P0",
+      "phase": "Project setup",
+      "description": "Create one GitHub repository that can be used safely from the desktop and laptop without relying on OneDrive.",
+      "acceptance_criteria": [
+        "The project is stored outside OneDrive",
+        "The local main branch is connected to GitHub",
+        "Changes can be pushed on one computer and pulled on the other"
+      ],
+      "labels": [
+        "setup",
+        "github"
+      ],
+      "notes": "The working copy is at C:/Users/mihae/source/repos/open-textbook-rag.",
+      "order": 0
+    },
+    {
+      "id": "OTR-002",
+      "title": "Prepare the local Python workspace",
+      "status": "done",
+      "priority": "P0",
+      "phase": "Project setup",
+      "description": "Create an isolated Python environment and install the libraries the first version of the project will need.",
+      "acceptance_criteria": [
+        "The project uses Python 3.12",
+        "The virtual environment starts correctly",
+        "The required libraries install without errors",
+        "The virtual environment is not uploaded to GitHub"
+      ],
+      "labels": [
+        "setup",
+        "python"
+      ],
+      "notes": "The dependency list can be simplified later when the main project structure is created.",
+      "order": 1
+    },
+    {
+      "id": "OTR-003",
+      "title": "Create a visual project board",
+      "status": "done",
+      "priority": "P0",
+      "phase": "Project setup",
+      "description": "Replace the difficult-to-read Markdown task list with a visual board that saves task changes into Git.",
+      "acceptance_criteria": [
+        "Tasks can be moved between To do, Doing, and Done",
+        "Tasks can be created and edited",
+        "Changes are saved to project_board/tasks.json",
+        "The board runs locally on both computers"
+      ],
+      "labels": [
+        "planning",
+        "project-board"
+      ],
+      "notes": "Use the Create task button at the top of the board to add your own work items.",
+      "order": 2
+    },
+    {
+      "id": "OTR-004",
+      "title": "Get the local database and file storage running",
+      "status": "todo",
+      "priority": "P0",
+      "phase": "Local data foundation",
+      "description": "Set up the two local services that will hold the project data: a database for organized information and search results, and file storage for untouched copies of imported textbook material.",
+      "acceptance_criteria": [
+        "One command starts both services",
+        "The project can connect to both services",
+        "Stored data remains available after the services restart",
+        "Passwords and local data are not uploaded to GitHub",
+        "A simple health check clearly says whether everything is working"
+      ],
+      "labels": [
+        "database",
+        "storage",
+        "next"
+      ],
+      "notes": "This is the recommended next task.",
+      "order": 13
+    },
+    {
+      "id": "OTR-005",
+      "title": "Agree on how we will import the first textbook",
+      "status": "todo",
+      "priority": "P0",
+      "phase": "First textbook import",
+      "description": "Confirm the official source, license, exact version, and first chapters of The Nature of Code before downloading any content. We should use the official source files instead of blindly scraping the rendered website.",
+      "acceptance_criteria": [
+        "The official source and website are recorded",
+        "The license and required attribution are recorded",
+        "The exact book version can be identified later",
+        "The first import is limited to the Introduction and Chapters 0–2",
+        "The import can be repeated on another computer"
+      ],
+      "labels": [
+        "nature-of-code",
+        "licensing",
+        "planning"
+      ],
+      "notes": "This prevents us from building the importer around an unreliable or unauthorized source.",
+      "order": 14
+    },
+    {
+      "id": "OTR-006",
+      "title": "Import the first chapters of The Nature of Code",
+      "status": "todo",
+      "priority": "P0",
+      "phase": "First textbook import",
+      "description": "Download the Introduction and Chapters 0–2 from the approved official source and preserve an untouched local copy before processing it.",
+      "acceptance_criteria": [
+        "The selected chapters download successfully",
+        "The untouched source files are stored locally",
+        "The source version and download time are recorded",
+        "Running the import twice does not create duplicate books or chapters",
+        "The import reports what it found and any failures"
+      ],
+      "labels": [
+        "nature-of-code",
+        "import"
+      ],
+      "notes": "This is the first real content entering the system.",
+      "order": 2
+    },
+    {
+      "id": "OTR-007",
+      "title": "Turn the imported files into an organized digital textbook",
+      "status": "todo",
+      "priority": "P0",
+      "phase": "First textbook import",
+      "description": "Read the imported source files and store the book in a clear hierarchy so the system knows which text and code belong to each chapter and section.",
+      "acceptance_criteria": [
+        "The book title and source information are stored",
+        "Chapters and sections appear in the correct order",
+        "Paragraphs and code examples remain attached to the correct section",
+        "Every section keeps a link to the original source",
+        "The stored content can be inspected without reading raw database rows"
+      ],
+      "labels": [
+        "organization",
+        "import"
+      ],
+      "notes": "The goal is a trustworthy digital copy, not search yet.",
+      "order": 3
+    },
+    {
+      "id": "OTR-008",
+      "title": "Break the textbook into useful searchable passages",
+      "status": "todo",
+      "priority": "P0",
+      "phase": "Prepare for search",
+      "description": "Divide each section into passages that are small enough to search but large enough to retain meaning. Code examples and closely related explanations should stay together.",
+      "acceptance_criteria": [
+        "Passages do not mix unrelated sections",
+        "Code examples are not cut in half",
+        "Each passage remembers its book, chapter, section, and source link",
+        "Passage size can be changed through configuration",
+        "A human can inspect sample passages and understand them"
+      ],
+      "labels": [
+        "content",
+        "search-preparation"
+      ],
+      "notes": "Good passage boundaries are essential for good answers later.",
+      "order": 4
+    },
+    {
+      "id": "OTR-009",
+      "title": "Make the textbook searchable",
+      "status": "todo",
+      "priority": "P0",
+      "phase": "Search",
+      "description": "Create a search system that finds passages both by exact wording and by meaning, then combines those results into one useful ranked list.",
+      "acceptance_criteria": [
+        "Exact terms such as function names can be found",
+        "Questions written differently from the textbook can still find relevant sections",
+        "Results show the chapter, section, source link, and search score",
+        "Search can be limited to a selected book or chapter",
+        "A short set of sample questions returns sensible passages"
+      ],
+      "labels": [
+        "search",
+        "embeddings"
+      ],
+      "notes": "This task includes connecting the local embedding model and combining keyword and meaning-based search.",
+      "order": 5
+    },
+    {
+      "id": "OTR-010",
+      "title": "Let us test textbook search from the terminal",
+      "status": "todo",
+      "priority": "P0",
+      "phase": "Search",
+      "description": "Create a simple command where we type a question and immediately see the most relevant textbook passages and their source links.",
+      "acceptance_criteria": [
+        "A question can be entered from the terminal",
+        "The most relevant passages are printed in order",
+        "Every result includes the book, chapter, section, and source link",
+        "Optional details explain why each passage ranked where it did",
+        "The command provides a clear error if the database or local model is unavailable"
+      ],
+      "labels": [
+        "search",
+        "terminal"
+      ],
+      "notes": "This lets us evaluate retrieval before asking an AI model to write answers.",
+      "order": 6
+    },
+    {
+      "id": "OTR-011",
+      "title": "Answer questions with the local AI model and show sources",
+      "status": "todo",
+      "priority": "P0",
+      "phase": "First grounded answer",
+      "description": "Send the retrieved textbook passages to a local model, generate a useful explanation, and show exactly which sections support the answer.",
+      "acceptance_criteria": [
+        "The local model answers using the retrieved textbook passages",
+        "The answer includes inspectable source links",
+        "The model admits when the textbook does not contain enough information",
+        "Outside knowledge is not presented as if it came from the book",
+        "The response records the model used and how long it took"
+      ],
+      "labels": [
+        "local-ai",
+        "answers",
+        "citations"
+      ],
+      "notes": "Completing this task finishes the first major product milestone.",
+      "order": 7
+    },
+    {
+      "id": "OTR-012",
+      "title": "Check whether search and answers are actually reliable",
+      "status": "todo",
+      "priority": "P1",
+      "phase": "Quality check",
+      "description": "Create a small set of questions with known textbook answers and use it to find weak search results, unsupported claims, and incorrect citations.",
+      "acceptance_criteria": [
+        "The test set covers facts, explanations, code, and unanswerable questions",
+        "Each question identifies the expected supporting section",
+        "Search quality and citation correctness are measured separately",
+        "Failures can be inspected rather than hidden behind one score",
+        "The results tell us what should be improved next"
+      ],
+      "labels": [
+        "quality",
+        "evaluation"
+      ],
+      "notes": "Do this before adding many new product features.",
+      "order": 8
+    },
+    {
+      "id": "OTR-013",
+      "title": "Add useful study modes",
+      "status": "todo",
+      "priority": "P1",
+      "phase": "Study experience",
+      "description": "Turn the basic question-answer system into a study companion with explanation, guided questioning, quizzes, and code walkthroughs.",
+      "acceptance_criteria": [
+        "Explain mode can adjust the level of detail",
+        "Socratic mode gives hints before revealing the answer",
+        "Quiz mode creates questions from selected chapters",
+        "Code walkthrough mode connects code to the textbook explanation",
+        "Every mode continues to show textbook sources"
+      ],
+      "labels": [
+        "study",
+        "tutoring"
+      ],
+      "notes": "Only start this after grounded answers work reliably.",
+      "order": 9
+    },
+    {
+      "id": "OTR-014",
+      "title": "Create a browser interface for studying",
+      "status": "todo",
+      "priority": "P1",
+      "phase": "Study experience",
+      "description": "Build a simple browser experience where a learner can choose a book and chapter, ask questions, inspect sources, and use the study modes.",
+      "acceptance_criteria": [
+        "A learner can select a book and chapter",
+        "Questions and answers stream in the browser",
+        "Sources open to the relevant textbook section",
+        "Retrieved passages can be inspected for debugging",
+        "The interface remains usable on a laptop screen"
+      ],
+      "labels": [
+        "browser",
+        "user-interface"
+      ],
+      "notes": "The underlying search and answer services should already work before this begins.",
+      "order": 10
+    },
+    {
+      "id": "OTR-015",
+      "title": "Prove the system works with a second textbook",
+      "status": "todo",
+      "priority": "P2",
+      "phase": "Reusable platform",
+      "description": "Import Dive into Deep Learning and verify that the same workflow works without rebuilding the system specifically for that book.",
+      "acceptance_criteria": [
+        "The second book uses the same import stages",
+        "Both books use the same search and answer system",
+        "Book-specific handling stays isolated",
+        "Users can choose which book or books to search",
+        "Licenses and attributions remain correct for both books"
+      ],
+      "labels": [
+        "second-book",
+        "reuse"
+      ],
+      "notes": "This is where the project becomes a reusable textbook platform instead of a one-book demo.",
+      "order": 11
+    },
+    {
+      "id": "OTR-016",
+      "title": "Compare local and hosted AI models fairly",
+      "status": "todo",
+      "priority": "P2",
+      "phase": "Model comparison",
+      "description": "Give different models the same question and the same textbook passages, then compare answer quality, speed, and cost without changing the evidence.",
+      "acceptance_criteria": [
+        "Every model receives identical retrieved passages",
+        "Answer quality and source faithfulness are recorded",
+        "Speed and API cost are recorded where applicable",
+        "Results can be repeated from saved configuration",
+        "The comparison explains its limitations"
+      ],
+      "labels": [
+        "benchmark",
+        "models"
+      ],
+      "notes": "This supports the final portfolio and research story.",
+      "order": 12
+    }
+  ]
+}
