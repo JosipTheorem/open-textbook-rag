@@ -1,0 +1,24 @@
+name: open-textbook-rag
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-textbook_rag}
+      POSTGRES_USER: ${POSTGRES_USER:-textbook_rag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

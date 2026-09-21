@@ -1,0 +1,99 @@
+OPEN TEXTBOOK RAG - DOCKER COMMANDS
+===================================
+
+Run these commands from the repository folder:
+C:\Users\mihae\source\repos\open-textbook-rag
+
+
+START THE DATABASE
+------------------
+1. Start Docker Desktop and wait until it says Docker is running.
+2. Open the VS Code terminal in this repository.
+3. Run:
+
+docker compose up -d
+
+
+SEE WHAT IS RUNNING
+-------------------
+docker compose ps
+
+
+STOP EVERYTHING SAFELY
+----------------------
+docker compose down
+
+This stops the database container but keeps all database data.
+
+IMPORTANT: Do not run "docker compose down -v" unless you deliberately want
+to delete the local database.
+
+
+OPEN A SQL TERMINAL
+-------------------
+docker compose exec postgres psql -U textbook_rag -d textbook_rag
+
+Useful commands inside the SQL terminal:
+
+\dt
+    List database tables.
+
+SELECT version();
+    Show the PostgreSQL version.
+
+SELECT extversion FROM pg_extension WHERE extname = 'vector';
+    Show whether pgvector is installed and its version.
+
+\q
+    Leave the SQL terminal.
+
+
+USE THE PROJECT ON ANOTHER COMPUTER
+-----------------------------------
+1. Install Git, Docker Desktop, WSL 2, Python, and VS Code.
+2. Clone this GitHub repository, or pull the newest changes if it is already cloned.
+3. Open the repository in VS Code.
+4. Start Docker Desktop.
+5. Run:
+
+docker compose up -d
+
+Docker reads compose.yaml, downloads the same container versions, and creates
+the same services automatically.
+
+Git synchronizes the instructions, but it does NOT synchronize the contents of
+the database. A new computer starts with an empty local database.
+Later, the textbook importer will be able to rebuild that data. We can also add
+database export/import commands if we need to transfer unique local data.
+
+
+INSTALL A VISUAL DATABASE APP (ONE TIME ONLY)
+----------------------------------------------
+This installation command can be run from any folder in normal PowerShell:
+
+winget install --exact --id DBeaver.DBeaver.Community
+
+After installation, open DBeaver from the Windows Start menu. Create a new
+PostgreSQL connection with these values:
+
+Host: localhost
+Port: 5432
+Database: textbook_rag
+Username: textbook_rag
+Password: local-development-only
+
+Docker Desktop and the database must be running before DBeaver can connect.
+
+
+APPLY DATABASE STRUCTURE CHANGES FROM GIT
+------------------------------------------
+Run this from the repository folder after starting Docker or after git pull:
+
+.\.venv\Scripts\python.exe -m alembic upgrade head
+
+See which database version is currently installed:
+
+.\.venv\Scripts\python.exe -m alembic current
+
+Alembic migration files are the version history. database\schema.sql is a
+generated DDL reference and should not be edited manually.
