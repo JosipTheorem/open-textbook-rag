@@ -11,8 +11,7 @@ alembic>=1.15,<2.0
 psycopg[binary,pool]>=3.2,<4.0
 pgvector>=0.4,<1.0
 
-# Object storage and HTTP
-minio>=7.2,<8.0
+# HTTP
 httpx>=0.28,<1.0
 
 # Logging and resilience

@@ -1,169 +1,72 @@
--- Generated from Alembic migrations. Do not edit manually.
+"""Generate Qwen embeddings through Ollama and add hybrid search."""
 
-BEGIN;
+from __future__ import annotations
 
-CREATE TABLE alembic_version (
-    version_num VARCHAR(32) NOT NULL,
-    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
-);
+from collections.abc import Sequence
 
--- Running upgrade  -> 0001_create_schemas
+from alembic import op
 
-CREATE EXTENSION IF NOT EXISTS vector;
+revision: str = "0003_embedding_search"
+down_revision: str | None = "0002_ingestion_tables"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
-CREATE SCHEMA IF NOT EXISTS textbook;
 
-CREATE SCHEMA IF NOT EXISTS sandbox;
+EMBEDDING_MODEL = "ollama/qwen3-embedding:0.6b"
+EMBEDDING_DIMENSION = 1024
 
-INSERT INTO alembic_version (version_num) VALUES ('0001_create_schemas') RETURNING alembic_version.version_num;
 
-COMMIT;
+def upgrade() -> None:
+    """Add SQL-driven embedding generation and one hybrid search function."""
+    op.execute("CREATE EXTENSION IF NOT EXISTS http")
 
-BEGIN;
+    op.execute(
+        f"""
+        ALTER TABLE textbook.chunks
+        ALTER COLUMN embedding TYPE vector({EMBEDDING_DIMENSION})
+        USING embedding::vector({EMBEDDING_DIMENSION})
+        """
+    )
 
--- Running upgrade 0001_create_schemas -> 0002_ingestion_tables
-
-CREATE TABLE textbook.books (
-    id UUID NOT NULL,
-    slug VARCHAR(120) NOT NULL,
-    title TEXT NOT NULL,
-    authors JSONB NOT NULL,
-    canonical_url TEXT NOT NULL,
-    license_identifier VARCHAR(80) NOT NULL,
-    license_url TEXT NOT NULL,
-    attribution TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uq_books_slug UNIQUE (slug)
-);
-
-CREATE TABLE textbook.editions (
-    id UUID NOT NULL,
-    book_id UUID NOT NULL,
-    source_type VARCHAR(40) NOT NULL,
-    source_url TEXT NOT NULL,
-    source_revision VARCHAR(80) NOT NULL,
-    content_hash VARCHAR(64) NOT NULL,
-    ingested_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uq_editions_book_revision UNIQUE (book_id, source_revision),
-    FOREIGN KEY(book_id) REFERENCES textbook.books (id) ON DELETE CASCADE
-);
-
-CREATE TABLE textbook.source_documents (
-    id UUID NOT NULL,
-    edition_id UUID NOT NULL,
-    source_path TEXT NOT NULL,
-    source_url TEXT NOT NULL,
-    canonical_url TEXT NOT NULL,
-    title TEXT NOT NULL,
-    ordinal INTEGER NOT NULL,
-    content_hash VARCHAR(64) NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uq_source_documents_edition_path UNIQUE (edition_id, source_path),
-    FOREIGN KEY(edition_id) REFERENCES textbook.editions (id) ON DELETE CASCADE
-);
-
-CREATE TABLE textbook.sections (
-    id UUID NOT NULL,
-    document_id UUID NOT NULL,
-    parent_id UUID,
-    level SMALLINT NOT NULL,
-    ordinal INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    heading_path JSONB NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uq_sections_document_ordinal UNIQUE (document_id, ordinal),
-    FOREIGN KEY(document_id) REFERENCES textbook.source_documents (id) ON DELETE CASCADE,
-    FOREIGN KEY(parent_id) REFERENCES textbook.sections (id) ON DELETE CASCADE
-);
-
-CREATE TABLE textbook.content_blocks (
-    id UUID NOT NULL,
-    section_id UUID NOT NULL,
-    ordinal INTEGER NOT NULL,
-    block_type VARCHAR(40) NOT NULL,
-    text TEXT NOT NULL,
-    metadata JSONB DEFAULT '{}'::jsonb NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uq_content_blocks_section_ordinal UNIQUE (section_id, ordinal),
-    FOREIGN KEY(section_id) REFERENCES textbook.sections (id) ON DELETE CASCADE
-);
-
-CREATE TABLE textbook.chunks (
-    id UUID NOT NULL,
-    section_id UUID NOT NULL,
-    chunk_index INTEGER NOT NULL,
-    text TEXT NOT NULL,
-    word_count INTEGER NOT NULL,
-    content_types TEXT[] NOT NULL,
-    heading_path JSONB NOT NULL,
-    source_url TEXT NOT NULL,
-    content_hash VARCHAR(64) NOT NULL,
-    text_search TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', text)) STORED NOT NULL,
-    embedding VECTOR,
-    embedding_model TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uq_chunks_section_index UNIQUE (section_id, chunk_index),
-    FOREIGN KEY(section_id) REFERENCES textbook.sections (id) ON DELETE CASCADE
-);
-
-CREATE INDEX ix_chunks_text_search ON textbook.chunks USING gin (text_search);
-
-CREATE TABLE textbook.ingestion_runs (
-    id UUID NOT NULL,
-    book_id UUID,
-    status VARCHAR(20) NOT NULL,
-    source_url TEXT NOT NULL,
-    source_revision VARCHAR(80) NOT NULL,
-    started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    finished_at TIMESTAMP WITH TIME ZONE,
-    documents_created INTEGER DEFAULT '0' NOT NULL,
-    sections_created INTEGER DEFAULT '0' NOT NULL,
-    blocks_created INTEGER DEFAULT '0' NOT NULL,
-    chunks_created INTEGER DEFAULT '0' NOT NULL,
-    error TEXT,
-    PRIMARY KEY (id),
-    FOREIGN KEY(book_id) REFERENCES textbook.books (id) ON DELETE SET NULL
-);
-
-UPDATE alembic_version SET version_num='0002_ingestion_tables' WHERE alembic_version.version_num = '0001_create_schemas';
-
-COMMIT;
-
-BEGIN;
-
--- Running upgrade 0002_ingestion_tables -> 0003_embedding_search
-
-CREATE EXTENSION IF NOT EXISTS http;
-
-ALTER TABLE textbook.chunks
-        ALTER COLUMN embedding TYPE vector(1024)
-        USING embedding::vector(1024);
-
-ALTER TABLE textbook.chunks ADD CONSTRAINT ck_chunks_embedding_model CHECK (
+    op.create_check_constraint(
+        "ck_chunks_embedding_model",
+        "chunks",
+        f"""
         (embedding IS NULL AND embedding_model IS NULL)
         OR
         (
             embedding IS NOT NULL
-            AND embedding_model = 'ollama/qwen3-embedding:0.6b'
+            AND embedding_model = '{EMBEDDING_MODEL}'
         )
-        );
+        """,
+        schema="textbook",
+    )
 
-CREATE INDEX ix_chunks_embedding_hnsw_cosine
+    op.execute(
+        """
+        CREATE INDEX ix_chunks_embedding_hnsw_cosine
         ON textbook.chunks
         USING hnsw (embedding vector_cosine_ops)
-        WHERE embedding IS NOT NULL;
+        WHERE embedding IS NOT NULL
+        """
+    )
 
-COMMENT ON COLUMN textbook.chunks.embedding IS
-        'L2-normalized 1024-dimensional embedding from Ollama qwen3-embedding:0.6b';
+    op.execute(
+        f"""
+        COMMENT ON COLUMN textbook.chunks.embedding IS
+        'L2-normalized {EMBEDDING_DIMENSION}-dimensional embedding from Ollama qwen3-embedding:0.6b'
+        """
+    )
+    op.execute(
+        """
+        COMMENT ON COLUMN textbook.chunks.embedding_model IS
+        'Exact embedding runtime and model; NULL until the chunk is embedded'
+        """
+    )
 
-COMMENT ON COLUMN textbook.chunks.embedding_model IS
-        'Exact embedding runtime and model; NULL until the chunk is embedded';
-
-CREATE FUNCTION textbook.ollama_embed(
+    op.execute(
+        f"""
+        CREATE FUNCTION textbook.ollama_embed(
             p_input text,
             p_input_kind text DEFAULT 'document',
             p_keep_alive text DEFAULT '5m'
@@ -179,12 +82,12 @@ CREATE FUNCTION textbook.ollama_embed(
             v_status integer;
             v_response_text text;
             v_response jsonb;
-            v_embedding vector(1024);
+            v_embedding vector({EMBEDDING_DIMENSION});
         BEGIN
             IF p_input_kind = 'query' THEN
                 v_input :=
                     'Instruct: Given a web search query, retrieve relevant passages that answer the query'
-                    || E'\nQuery: '
+                    || E'\\nQuery: '
                     || p_input;
             ELSIF p_input_kind = 'document' THEN
                 v_input := p_input;
@@ -207,7 +110,7 @@ CREATE FUNCTION textbook.ollama_embed(
                 jsonb_build_object(
                     'model', 'qwen3-embedding:0.6b',
                     'input', v_input,
-                    'dimensions', 1024,
+                    'dimensions', {EMBEDDING_DIMENSION},
                     'truncate', false,
                     'keep_alive', p_keep_alive
                 )::text,
@@ -231,19 +134,23 @@ CREATE FUNCTION textbook.ollama_embed(
             END IF;
 
             v_embedding :=
-                ((v_response -> 'embeddings' -> 0)::text)::vector(1024);
+                ((v_response -> 'embeddings' -> 0)::text)::vector({EMBEDDING_DIMENSION});
 
-            IF vector_dims(v_embedding) <> 1024 THEN
+            IF vector_dims(v_embedding) <> {EMBEDDING_DIMENSION} THEN
                 RAISE EXCEPTION
-                    'Expected a 1024-dimensional embedding, received %',
+                    'Expected a {EMBEDDING_DIMENSION}-dimensional embedding, received %',
                     vector_dims(v_embedding);
             END IF;
 
             RETURN v_embedding;
         END
-        $function$;
+        $function$
+        """
+    )
 
-CREATE PROCEDURE textbook.embed_chunks(
+    op.execute(
+        f"""
+        CREATE PROCEDURE textbook.embed_chunks(
             p_force boolean DEFAULT false
         )
         LANGUAGE plpgsql
@@ -273,7 +180,7 @@ CREATE PROCEDURE textbook.embed_chunks(
                         'document',
                         '5m'
                     ),
-                    embedding_model = 'ollama/qwen3-embedding:0.6b'
+                    embedding_model = '{EMBEDDING_MODEL}'
                 WHERE id = v_chunk.id;
 
                 v_completed := v_completed + 1;
@@ -285,9 +192,13 @@ CREATE PROCEDURE textbook.embed_chunks(
 
             ANALYZE textbook.chunks;
         END
-        $procedure$;
+        $procedure$
+        """
+    )
 
-CREATE FUNCTION textbook.search_chunks_hybrid(
+    op.execute(
+        f"""
+        CREATE FUNCTION textbook.search_chunks_hybrid(
             p_query_text text,
             p_match_count integer DEFAULT 10,
             p_rrf_k integer DEFAULT 60,
@@ -367,7 +278,7 @@ CREATE FUNCTION textbook.search_chunks_hybrid(
                 CROSS JOIN query_inputs AS q
                 WHERE
                     c.embedding IS NOT NULL
-                    AND c.embedding_model = 'ollama/qwen3-embedding:0.6b'
+                    AND c.embedding_model = '{EMBEDDING_MODEL}'
                 ORDER BY
                     c.embedding <=> q.query_embedding,
                     c.id
@@ -435,23 +346,67 @@ CREATE FUNCTION textbook.search_chunks_hybrid(
                 f.hybrid_score DESC,
                 c.id
             LIMIT (SELECT result_count FROM settings)
-        $function$;
+        $function$
+        """
+    )
 
-COMMENT ON FUNCTION textbook.ollama_embed(text, text, text) IS
-        'Request one normalized 1024-dimensional Qwen embedding from the private Ollama service';
-
-COMMENT ON PROCEDURE textbook.embed_chunks(boolean) IS
-        'Generate SQL-driven embeddings for missing chunks, or all chunks when p_force is true';
-
-COMMENT ON FUNCTION textbook.search_chunks_hybrid(
+    op.execute(
+        """
+        COMMENT ON FUNCTION textbook.ollama_embed(text, text, text) IS
+        'Request one normalized 1024-dimensional Qwen embedding from the private Ollama service'
+        """
+    )
+    op.execute(
+        """
+        COMMENT ON PROCEDURE textbook.embed_chunks(boolean) IS
+        'Generate SQL-driven embeddings for missing chunks, or all chunks when p_force is true'
+        """
+    )
+    op.execute(
+        """
+        COMMENT ON FUNCTION textbook.search_chunks_hybrid(
             text,
             integer,
             integer,
             real,
             real
         ) IS
-        'Embed a question and combine PostgreSQL full-text and cosine-vector ranks with RRF';
+        'Embed a question and combine PostgreSQL full-text and cosine-vector ranks with RRF'
+        """
+    )
 
-UPDATE alembic_version SET version_num='0003_embedding_search' WHERE alembic_version.version_num = '0002_ingestion_tables';
 
-COMMIT;
+def downgrade() -> None:
+    """Remove SQL embedding support and return to an unbounded vector column."""
+    op.execute(
+        """
+        DROP FUNCTION textbook.search_chunks_hybrid(
+            text,
+            integer,
+            integer,
+            real,
+            real
+        )
+        """
+    )
+    op.execute("DROP PROCEDURE textbook.embed_chunks(boolean)")
+    op.execute("DROP FUNCTION textbook.ollama_embed(text, text, text)")
+    op.drop_index(
+        "ix_chunks_embedding_hnsw_cosine",
+        table_name="chunks",
+        schema="textbook",
+    )
+    op.drop_constraint(
+        "ck_chunks_embedding_model",
+        "chunks",
+        schema="textbook",
+        type_="check",
+    )
+    op.execute(
+        """
+        ALTER TABLE textbook.chunks
+        ALTER COLUMN embedding TYPE vector
+        USING embedding::vector
+        """
+    )
+    op.execute("DROP EXTENSION IF EXISTS http")

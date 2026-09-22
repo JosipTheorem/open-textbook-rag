@@ -2,7 +2,13 @@ name: open-textbook-rag
 
 services:
   postgres:
-    image: pgvector/pgvector:0.8.6-pg17
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    image: open-textbook-rag-postgres:pg17-vector-http
+    depends_on:
+      ollama-embeddings:
+        condition: service_healthy
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-textbook_rag}
       POSTGRES_USER: ${POSTGRES_USER:-textbook_rag}
@@ -20,5 +26,23 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  ollama-embeddings:
+    image: ollama/ollama:0.34.2
+    environment:
+      OLLAMA_KEEP_ALIVE: 5m
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama_embedding_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  ollama_embedding_models:

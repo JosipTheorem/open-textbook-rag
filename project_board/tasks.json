@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-09-19T13:18:58.531Z",
+  "updated_at": "2026-09-22T15:05:48.403Z",
   "tasks": [
     {
       "id": "OTR-001",
@@ -64,7 +64,7 @@
     {
       "id": "OTR-004",
       "title": "Get the local database and file storage running",
-      "status": "todo",
+      "status": "done",
       "priority": "P0",
       "phase": "Local data foundation",
       "description": "Set up the two local services that will hold the project data: a database for organized information and search results, and file storage for untouched copies of imported textbook material.",
@@ -81,12 +81,12 @@
         "next"
       ],
       "notes": "This is the recommended next task.",
-      "order": 13
+      "order": 3
     },
     {
       "id": "OTR-005",
       "title": "Agree on how we will import the first textbook",
-      "status": "todo",
+      "status": "done",
       "priority": "P0",
       "phase": "First textbook import",
       "description": "Confirm the official source, license, exact version, and first chapters of The Nature of Code before downloading any content. We should use the official source files instead of blindly scraping the rendered website.",
@@ -103,7 +103,7 @@
         "planning"
       ],
       "notes": "This prevents us from building the importer around an unreliable or unauthorized source.",
-      "order": 14
+      "order": 4
     },
     {
       "id": "OTR-006",

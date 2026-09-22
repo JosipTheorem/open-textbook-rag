@@ -1,0 +1,17 @@
+id: dive-into-deep-learning
+title: Dive into Deep Learning
+authors:
+  - Aston Zhang
+  - Zachary C. Lipton
+  - Mu Li
+  - Alexander J. Smola
+source_type: git_markdown
+source_url: https://github.com/d2l-ai/d2l-en.git
+canonical_url: https://d2l.ai/
+license_identifier: CC-BY-SA-4.0
+license_url: https://creativecommons.org/licenses/by-sa/4.0/
+attribution: Dive into Deep Learning by Aston Zhang, Zachary C. Lipton, Mu Li, and Alexander J. Smola
+authorized_for_ingestion: true
+snapshot_directory: data/raw/d2l-en
+include_patterns:
+  - chapter_introduction/**/*.md

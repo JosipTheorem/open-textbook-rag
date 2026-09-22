@@ -11,7 +11,7 @@ START THE DATABASE
 2. Open the VS Code terminal in this repository.
 3. Run:
 
-docker compose up -d
+docker compose up -d --build
 
 
 SEE WHAT IS RUNNING
@@ -53,18 +53,41 @@ USE THE PROJECT ON ANOTHER COMPUTER
 1. Install Git, Docker Desktop, WSL 2, Python, and VS Code.
 2. Clone this GitHub repository, or pull the newest changes if it is already cloned.
 3. Open the repository in VS Code.
-4. Start Docker Desktop.
-5. Run:
+4. In the repository's PowerShell terminal, create the virtual environment:
 
-docker compose up -d
+py -m venv .venv
+
+5. Install the Python project dependencies without activating the environment:
+
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+6. Start Docker Desktop and run:
+
+docker compose up -d --build
+
+7. Download the embedding model into that computer's Docker volume:
+
+docker compose exec ollama-embeddings ollama pull qwen3-embedding:0.6b
+
+8. Build the database structure:
+
+.\.venv\Scripts\python.exe -m alembic upgrade head
+
+9. Import the licensed textbook sample:
+
+.\.venv\Scripts\python.exe .\scripts\ingest_book.py https://github.com/d2l-ai/d2l-en --max-files 1
+
+10. In DBeaver, generate embeddings:
+
+CALL textbook.embed_chunks();
 
 Docker reads compose.yaml, downloads the same container versions, and creates
 the same services automatically.
 
 Git synchronizes the instructions, but it does NOT synchronize the contents of
-the database. A new computer starts with an empty local database.
-Later, the textbook importer will be able to rebuild that data. We can also add
-database export/import commands if we need to transfer unique local data.
+the database or downloaded AI models. A new computer starts with empty Docker
+volumes, then the commands above rebuild the database and embeddings.
 
 
 INSTALL A VISUAL DATABASE APP (ONE TIME ONLY)
@@ -85,6 +108,20 @@ Password: local-development-only
 Docker Desktop and the database must be running before DBeaver can connect.
 
 
+PREPARE THE EMBEDDING MODEL (ONCE PER COMPUTER)
+------------------------------------------------
+Run from the repository folder after Docker services are running:
+
+docker compose exec ollama-embeddings ollama pull qwen3-embedding:0.6b
+
+Check that the model is available:
+
+docker compose exec ollama-embeddings ollama list
+
+The embedding Ollama service is CPU-only. This keeps the GPU available for the
+local LLM that will answer questions later.
+
+
 APPLY DATABASE STRUCTURE CHANGES FROM GIT
 ------------------------------------------
 Run this from the repository folder after starting Docker or after git pull:
@@ -97,3 +134,44 @@ See which database version is currently installed:
 
 Alembic migration files are the version history. database\schema.sql is a
 generated DDL reference and should not be edited manually.
+
+
+CREATE EMBEDDINGS AND TEST HYBRID SEARCH
+-----------------------------------------
+After importing textbook chunks, open database\embed_and_search.sql in DBeaver.
+Run its sections in order. The command that embeds all missing chunks is:
+
+CALL textbook.embed_chunks();
+
+It is safe to rerun because it skips chunks that already have embeddings.
+
+Test hybrid search with:
+
+SELECT *
+FROM textbook.search_chunks_hybrid('What is machine learning?', 5);
+
+The search function creates the question embedding and combines PostgreSQL text
+search with vector similarity. There are no separate public text-only or
+vector-only search functions.
+
+
+IMPORT THE APPROVED D2L INTRODUCTION SAMPLE
+--------------------------------------------
+Run from the repository folder while Docker is running:
+
+.\.venv\Scripts\python.exe .\scripts\ingest_book.py https://github.com/d2l-ai/d2l-en --max-files 1
+
+The source download stays under ignored data\raw storage. The structured
+sections and chunks are stored in PostgreSQL. Re-running the command replaces
+the same source revision instead of creating duplicate book content.
+
+Refresh the textbook schema in DBeaver, then inspect imported chunks with:
+
+SELECT
+    s.heading_path,
+    c.chunk_index,
+    c.word_count,
+    left(c.text, 300) AS preview
+FROM textbook.chunks AS c
+JOIN textbook.sections AS s ON s.id = c.section_id
+ORDER BY s.ordinal, c.chunk_index;
