@@ -43,6 +43,28 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  ollama-llm:
+    image: ollama/ollama:0.34.2
+    gpus: all
+    environment:
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_LLM_CONTEXT_LENGTH:-16384}
+      OLLAMA_KEEP_ALIVE: 10m
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    ports:
+      - "127.0.0.1:${OLLAMA_LLM_PORT:-11435}:11434"
+    volumes:
+      - ollama_llm_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   ollama_embedding_models:
+  ollama_llm_models:

@@ -151,6 +151,8 @@ activemq-data/
 .env
 .envrc
 .venv
+.langgraph_api/
+textbook-chat/
 env/
 venv/
 ENV/

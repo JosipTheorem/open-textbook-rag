@@ -59,6 +59,65 @@ FROM textbook.search_chunks_hybrid('What is machine learning?', 5);
 
 See `database/embed_and_search.sql` for checks and readable examples.
 
+## Local LangGraph textbook assistant
+
+The answer-generating model runs in a separate GPU-enabled Ollama container so
+the private CPU-only embedding service remains isolated. Start the services and
+download the model once:
+
+```powershell
+docker compose up -d
+docker compose exec ollama-llm ollama pull qwen3.5:9b-q4_K_M
+```
+
+Ask one question:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\chat.py `
+    "What is supervised learning?"
+```
+
+Or start an interactive prompt:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\chat.py
+```
+
+For the browser chat UI, start the LangGraph server in one PowerShell window:
+
+```powershell
+.\.venv\Scripts\langgraph.exe dev --no-browser
+```
+
+Then start the frontend in a second PowerShell window:
+
+```powershell
+cd .\textbook-chat
+pnpm dev
+```
+
+Open `http://localhost:3000`. The frontend is preconfigured for the local graph
+named `agent` at `http://localhost:2024`; no LangSmith key is needed for this
+local chat UI. The frontend is an ignored local checkout of the official
+`langchain-ai/agent-chat-ui` repository rather than duplicated application code.
+
+On a new computer, install the frontend once:
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS --exact
+npm install --global pnpm@10.5.1
+git clone https://github.com/langchain-ai/agent-chat-ui.git textbook-chat
+Copy-Item .\textbook-chat\.env.example .\textbook-chat\.env
+cd .\textbook-chat
+pnpm install
+```
+
+The LangGraph agent has exactly one tool: the database-owned
+`textbook.search_chunks_hybrid` function. It must retrieve evidence before
+answering and includes the source section and URL in its response. Configuration
+is available in `.env.example`; the default model endpoint is private to this
+computer at `127.0.0.1:11435`.
+
 ## Database versions
 
 Alembic records database-structure changes in Git. Apply every migration that
