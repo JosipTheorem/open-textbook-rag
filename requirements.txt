@@ -24,10 +24,7 @@ langchain-ollama>=1.1,<2.0
 structlog>=24.4,<27.0
 tenacity>=9.0,<10.0
 
-# Development and testing
-pytest>=8.3,<10.0
-pytest-asyncio>=0.25,<2.0
-pytest-cov>=6.0,<8.0
+# Development tooling
 ruff>=0.11,<1.0
 mypy>=1.15,<2.0
 types-PyYAML>=6.0,<7.0

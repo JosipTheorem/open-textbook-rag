@@ -70,19 +70,6 @@ docker compose up -d
 docker compose exec ollama-llm ollama pull qwen3.5:9b-q4_K_M
 ```
 
-Ask one question:
-
-```powershell
-.\.venv\Scripts\python.exe .\scripts\chat.py `
-    "What is supervised learning?"
-```
-
-Or start an interactive prompt:
-
-```powershell
-.\.venv\Scripts\python.exe .\scripts\chat.py
-```
-
 For the browser chat UI, start the LangGraph server in one PowerShell window:
 
 ```powershell
