@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Textbook voice</title>
+<style>
+body{font:16px system-ui,sans-serif;max-width:780px;margin:3rem auto;padding:0 1rem;background:#111827;color:#f9fafb}
+button,select,input{font:inherit;padding:.7rem;border-radius:.5rem;border:1px solid #4b5563}
+button{background:#2563eb;color:white;cursor:pointer}button:disabled{opacity:.5;cursor:default}
+input{background:#1f2937;color:white;width:75%}select{background:#1f2937;color:white}
+.row{display:flex;gap:.5rem;align-items:center;margin:1rem 0}#log{height:50vh;overflow:auto;border:1px solid #374151;border-radius:.7rem;padding:1rem;background:#1f2937;white-space:pre-wrap}
+.message{margin:0 0 1.3rem}.who{font-weight:700;color:#93c5fd}.partial{color:#9ca3af}
+</style>
+<h1>Textbook voice</h1>
+<p>Speak to the same local Qwen + hybrid-search agent. Headphones help avoid echo.</p>
+<div class="row"><select id="language"><option value="auto">Auto language</option><option value="hr-HR">Hrvatski</option><option value="en-US">English</option></select><button id="talk">Start talking</button><button id="stop" disabled>Stop / send</button><button id="cancel">Stop answer</button></div>
+<p id="status">Connecting…</p><p id="partial" class="partial"></p>
+<div id="log" aria-live="polite"></div>
+<form id="form" class="row"><input id="question" placeholder="Or type a question"><button>Send</button></form>
+<script>
+const $=id=>document.getElementById(id), log=$('log');
+let socket, stream, context, source, worklet, playing=[], nextTime=0;
+function status(s){$('status').textContent=s}
+function message(who,text){const p=document.createElement('div');p.className='message';const label=document.createElement('div');label.className='who';label.textContent=who;p.append(label,document.createTextNode(text));log.append(p);log.scrollTop=log.scrollHeight}
+function connect(){socket=new WebSocket(`ws://${location.host}/ws`);socket.onopen=()=>status('Ready');socket.onclose=()=>{status('Disconnected; retrying…');setTimeout(connect,1500)};socket.onmessage=async e=>{const x=JSON.parse(e.data);if(x.type==='status')status(x.text);if(x.type==='partial')$('partial').textContent=x.text;if(x.type==='user'){message('You',x.text);$('partial').textContent=''}if(x.type==='assistant')message('Agent',x.text);if(x.type==='error')status(x.text);if(x.type==='done')status('Ready');if(x.type==='audio'){const raw=atob(x.data),b=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)b[i]=raw.charCodeAt(i);await play(b.buffer)}}}
+async function play(bytes){context ||= new AudioContext();await context.resume();const decoded=await context.decodeAudioData(bytes);const node=context.createBufferSource();node.buffer=decoded;node.connect(context.destination);node.start(Math.max(context.currentTime,nextTime));nextTime=Math.max(context.currentTime,nextTime)+decoded.duration;playing.push(node);node.onended=()=>playing=playing.filter(n=>n!==node)}
+function stopAudio(){for(const node of playing)try{node.stop()}catch{}playing=[];nextTime=0}
+async function stopMic(){if(worklet){worklet.port.onmessage=null;worklet.disconnect();worklet=null}if(source){source.disconnect();source=null}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('talk').disabled=false;$('stop').disabled=true}
+$('talk').onclick=async()=>{try{stopAudio();stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});context ||= new AudioContext();await context.resume();await context.audioWorklet.addModule('/capture.js');source=context.createMediaStreamSource(stream);worklet=new AudioWorkletNode(context,'capture');worklet.port.onmessage=e=>{if(socket.readyState===1)socket.send(e.data)};source.connect(worklet);worklet.connect(context.destination);socket.send(JSON.stringify({type:'start',language:$('language').value}));$('talk').disabled=true;$('stop').disabled=false}catch(e){status(`Microphone failed: ${e}`);await stopMic()}};
+$('stop').onclick=async()=>{await stopMic();socket.send(JSON.stringify({type:'stop'}))};
+$('cancel').onclick=()=>{stopAudio();socket.send(JSON.stringify({type:'cancel'}));status('Answer stopped')};
+$('form').onsubmit=e=>{e.preventDefault();const text=$('question').value.trim();if(!text)return;socket.send(JSON.stringify({type:'text',text}));$('question').value=''};
+connect();
+</script>
+</html>

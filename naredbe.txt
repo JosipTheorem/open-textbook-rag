@@ -14,3 +14,5 @@
 - `cd .\textbook-chat; pnpm dev` — Pokreni web chat na portu 3000.
 - `winget install --exact --id DBeaver.DBeaver.Community` — Instaliraj DBeaver.
 - `docker compose exec postgres psql -U textbook_rag -d textbook_rag` — Otvori PostgreSQL terminal.
+- `& "$env:LOCALAPPDATA\Programs\NeMoSpeech\bin\nemo-speech.exe" serve --asr-model nemotron-3.5 --gpu 0 --endpointing` — Pokreni streaming transkripciju.
+- `.\.venv\Scripts\python.exe -m uvicorn voice_app.server:app --host 127.0.0.1 --port 8766` — Pokreni glasovni razgovor na http://127.0.0.1:8766.

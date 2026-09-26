@@ -105,6 +105,46 @@ answering and includes the source section and URL in its response. Configuration
 is available in `.env.example`; the default model endpoint is private to this
 computer at `127.0.0.1:11435`.
 
+## Local voice chat (Croatian and English)
+
+Voice is an input/output layer around the existing `textbook_agent.agent.build_agent()`
+graph. It does not add another LLM or another retrieval tool. The browser sends
+16 kHz microphone audio to NeMo-Speech.cpp's streaming Nemotron ASR; the final
+transcript goes to the existing LangGraph/Qwen/hybrid-search agent; Supertonic 3
+speaks the answer on CPU. The separate voice page keeps the ignored upstream
+Agent Chat UI checkout untouched. Conversation state lives in the voice page's
+WebSocket session; refreshing it starts a new conversation.
+
+One-time Windows installation:
+
+```powershell
+& ([scriptblock]::Create((curl.exe -L --silent https://raw.githubusercontent.com/NVIDIA/NeMo-Speech.cpp/main/scripts/install.ps1 | Out-String))) -Backend cuda -BinaryOnly
+& "$env:LOCALAPPDATA\Programs\NeMoSpeech\bin\nemo-speech.exe" pull nemotron-3.5
+.\.venv\Scripts\python.exe -m pip install -r requirements-voice.txt
+```
+
+Start Docker first. Then run these in two separate PowerShell windows from the
+repository root (the first command keeps the ASR model loaded):
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\NeMoSpeech\bin\nemo-speech.exe" serve --asr-model nemotron-3.5 --gpu 0 --endpointing
+```
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn voice_app.server:app --host 127.0.0.1 --port 8766
+```
+
+Open `http://127.0.0.1:8766`, allow microphone access, choose Auto, Hrvatski,
+or English, then click **Start talking** and **Stop / send**. You can type in
+the same page, too. On first use Supertonic downloads its ONNX weights into
+the local Hugging Face cache; subsequent runs reuse them. No CUDA toolkit or
+PyTorch installation is required for this setup. If Nemotron's Croatian
+transcription is not accurate enough, its ASR is isolated behind `VOICE_ASR_WS`
+so it can be changed without changing the agent.
+
+Voice source files are in `voice_app/`; `server.py` bridges ASR, agent and TTS,
+`capture.js` downsamples browser audio, and `index.html` is the local UI.
+
 ## Database versions
 
 Alembic records database-structure changes in Git. Apply every migration that
