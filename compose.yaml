@@ -4,7 +4,7 @@ services:
   postgres:
     build:
       context: .
-      dockerfile: docker/postgres/Dockerfile
+      dockerfile: database/postgres/Dockerfile
     image: open-textbook-rag-postgres:pg17-vector-http
     depends_on:
       ollama-embeddings:
@@ -17,7 +17,7 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./database/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s

@@ -5,9 +5,9 @@
 - `docker compose exec ollama-embeddings ollama pull qwen3-embedding:0.6b` — Preuzmi embedding model jednom po računalu.
 - `docker compose exec ollama-llm ollama pull qwen3.5:9b-q4_K_M` — Preuzmi Qwen model jednom po računalu.
 - `.\.venv\Scripts\python.exe -m pip install -r requirements.txt` — Instaliraj Python ovisnosti.
-- `.\.venv\Scripts\python.exe -m alembic upgrade head` — Primijeni sve migracije baze.
-- `.\.venv\Scripts\python.exe -m alembic current` — Prikaži trenutnu verziju baze.
-- `.\.venv\Scripts\python.exe .\scripts\ingest_book.py https://github.com/d2l-ai/d2l-en --max-files 1` — Uvezi ogledni D2L sadržaj.
+- `.\.venv\Scripts\python.exe -m alembic -c .\database\alembic.ini upgrade head` — Primijeni sve migracije baze.
+- `.\.venv\Scripts\python.exe -m alembic -c .\database\alembic.ini current` — Prikaži trenutnu verziju baze.
+- `.\.venv\Scripts\python.exe .\book_scraper\ingest_book.py https://github.com/d2l-ai/d2l-en --max-files 1` — Uvezi ogledni D2L sadržaj.
 - `CALL textbook.embed_chunks();` — Izradi embeddinge u DBeaveru.
 - `SELECT * FROM textbook.search_chunks_hybrid('What is machine learning?', 5);` — Testiraj hibridno pretraživanje.
 - `.\.venv\Scripts\langgraph.exe dev --no-browser` — Pokreni LangGraph backend na portu 2024.

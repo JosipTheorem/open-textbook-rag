@@ -6,7 +6,7 @@ technical textbooks into grounded AI learning companions.
 ## Local database
 
 Docker runs PostgreSQL with pgvector plus a private CPU-only Ollama service for
-embeddings. Original and processed textbook files stay in the ignored `data/`
+embeddings. Original and processed textbook files stay in the ignored `book_scraper/data/`
 folders. Build and start the services from the repository root:
 
 ```powershell
@@ -57,7 +57,7 @@ SELECT *
 FROM textbook.search_chunks_hybrid('What is machine learning?', 5);
 ```
 
-See `database/embed_and_search.sql` for checks and readable examples.
+See `database/sql/embed_and_search.sql` for the two DBeaver commands.
 
 ## Local LangGraph textbook assistant
 
@@ -151,27 +151,41 @@ Alembic records database-structure changes in Git. Apply every migration that
 has not yet run on the current computer:
 
 ```powershell
-.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic -c .\database\alembic.ini upgrade head
 ```
 
 Check the installed database version:
 
 ```powershell
-.\.venv\Scripts\python.exe -m alembic current
+.\.venv\Scripts\python.exe -m alembic -c .\database\alembic.ini current
 ```
 
-The authoritative history is in `migrations/versions/`. The generated
-`database/schema.sql` file provides the equivalent readable PostgreSQL DDL and
+The authoritative history is in `database/migrations/versions/`. The generated
+`database/sql/schema.sql` file provides the equivalent readable PostgreSQL DDL and
 must not be edited manually.
 
 ## Import a licensed textbook sample
+
+The complete import workflow lives under `book_scraper/`:
+
+```text
+book_scraper/
+  ingest_book.py                 Git/Markdown importer
+  sources/                       reviewed source manifests
+  data/raw/                      downloaded Git checkouts (ignored)
+  data/processed/                reserved local intermediates (ignored)
+```
+
+In a manifest, `snapshot_directory` is relative to `book_scraper/`. The
+downloaded snapshot is local working data; the imported sections and chunks
+are stored in PostgreSQL, not in `data/processed/`.
 
 The first source is the official Git repository for *Dive into Deep Learning*,
 licensed under CC BY-SA 4.0. Import one Introduction document from the approved
 source manifest:
 
 ```powershell
-.\.venv\Scripts\python.exe .\scripts\ingest_book.py `
+.\.venv\Scripts\python.exe .\book_scraper\ingest_book.py `
     https://github.com/d2l-ai/d2l-en `
     --max-files 1
 ```
@@ -180,7 +194,7 @@ The importer records the exact Git revision and license, preserves the heading
 hierarchy, stores paragraphs/code/equations as typed blocks, and creates chunks
 that never cross section boundaries. Re-running the same revision replaces its
 structured content instead of duplicating it. Downloaded source files remain in
-ignored `data/raw/` storage.
+ignored `book_scraper/data/raw/` storage.
 
 This stage deliberately leaves `textbook.chunks.embedding` empty. Run
 `CALL textbook.embed_chunks();` after inspecting the imported chunks.

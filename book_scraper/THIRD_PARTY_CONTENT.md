@@ -12,7 +12,7 @@ corpora, generated chunks, or embeddings.
 - License: https://creativecommons.org/licenses/by-sa/4.0/
 - Sample/reference code: separate modified MIT license in the source repository
 
-Local source snapshots are downloaded into ignored `data/raw/` directories.
+Local source snapshots are downloaded into ignored `book_scraper/data/raw/` directories.
 Database records retain the source URL, exact Git revision, license, attribution,
 and content hashes. If transformed book content is shared, the attribution and
 ShareAlike obligations of CC BY-SA 4.0 must be preserved.

@@ -20,7 +20,8 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = REPOSITORY_ROOT / "book_sources" / "dive-into-deep-learning.yaml"
+SCRAPER_ROOT = Path(__file__).resolve().parent
+DEFAULT_MANIFEST = SCRAPER_ROOT / "sources" / "dive-into-deep-learning.yaml"
 DEFAULT_DATABASE_URL = (
     "postgresql://textbook_rag:local-development-only@127.0.0.1:5432/textbook_rag"
 )
@@ -345,10 +346,10 @@ def ensure_source(manifest: dict[str, Any]) -> tuple[Path, str]:
     source_url = str(manifest["source_url"])
     if not source_url.startswith("https://"):
         raise ValueError("Only HTTPS Git sources are accepted.")
-    snapshot = (REPOSITORY_ROOT / str(manifest["snapshot_directory"])).resolve()
-    raw_root = (REPOSITORY_ROOT / "data" / "raw").resolve()
+    snapshot = (SCRAPER_ROOT / str(manifest["snapshot_directory"])).resolve()
+    raw_root = (SCRAPER_ROOT / "data" / "raw").resolve()
     if raw_root not in snapshot.parents:
-        raise ValueError("Source snapshots must stay inside data/raw/.")
+        raise ValueError("Source snapshots must stay inside book_scraper/data/raw/.")
 
     if not (snapshot / ".git").exists():
         snapshot.parent.mkdir(parents=True, exist_ok=True)
