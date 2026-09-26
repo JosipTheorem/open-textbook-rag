@@ -15,11 +15,13 @@ from urllib.parse import quote, urljoin
 from uuid import UUID, uuid4
 
 import yaml
+from dotenv import load_dotenv
 from psycopg import Connection, connect
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(REPOSITORY_ROOT / ".env")
 SCRAPER_ROOT = Path(__file__).resolve().parent
 DEFAULT_MANIFEST = SCRAPER_ROOT / "sources" / "dive-into-deep-learning.yaml"
 DEFAULT_DATABASE_URL = (

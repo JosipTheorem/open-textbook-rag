@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import os
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
 config = context.config
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

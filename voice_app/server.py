@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 import websockets
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from langchain_core.messages import AIMessage, HumanMessage
@@ -21,6 +22,7 @@ from supertonic import TTS
 
 from textbook_agent.agent import build_agent
 
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 NEMO_WS = os.getenv(
     "VOICE_ASR_WS", "ws://127.0.0.1:8080/v1/audio/transcriptions/realtime"
 )

@@ -10,8 +10,6 @@
 - `.\.venv\Scripts\python.exe .\book_scraper\ingest_book.py https://github.com/d2l-ai/d2l-en --max-files 1` — Uvezi ogledni D2L sadržaj.
 - `CALL textbook.embed_chunks();` — Izradi embeddinge u DBeaveru.
 - `SELECT * FROM textbook.search_chunks_hybrid('What is machine learning?', 5);` — Testiraj hibridno pretraživanje.
-- `.\.venv\Scripts\langgraph.exe dev --no-browser` — Pokreni LangGraph backend na portu 2024.
-- `cd .\textbook-chat; pnpm dev` — Pokreni web chat na portu 3000.
 - `winget install --exact --id DBeaver.DBeaver.Community` — Instaliraj DBeaver.
 - `docker compose exec postgres psql -U textbook_rag -d textbook_rag` — Otvori PostgreSQL terminal.
 - `& "$env:LOCALAPPDATA\Programs\NeMoSpeech\bin\nemo-speech.exe" serve --asr-model nemotron-3.5 --gpu 0 --endpointing` — Pokreni streaming transkripciju.

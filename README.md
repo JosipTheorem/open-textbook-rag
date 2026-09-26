@@ -1,201 +1,94 @@
-# Open Textbook RAG Lab
+# Open Textbook RAG
 
-A local-first study platform for turning openly licensed or user-authorized
-technical textbooks into grounded AI learning companions.
+A local study assistant that answers questions using passages from an open textbook.
+It imports approved Git-hosted Markdown books into PostgreSQL, combines keyword and
+vector search, and gives a local Qwen model one LangGraph search tool. Answers cite
+the book sections they used. The voice page accepts Croatian or English
+speech and reads answers aloud.
 
-## Local database
+The sample source is [Dive into Deep Learning](https://d2l.ai/). Book text, model
+weights, and generated embeddings are downloaded or created locally; they are not
+included in this repository.
 
-Docker runs PostgreSQL with pgvector plus a private CPU-only Ollama service for
-embeddings. Original and processed textbook files stay in the ignored `book_scraper/data/`
-folders. Build and start the services from the repository root:
+## Requirements
+
+The steps below are for Windows PowerShell, the environment this project has been
+tested on. You need Git, Python 3.13, and Docker Desktop. The default Qwen service
+requests an NVIDIA GPU; on Windows, Docker Desktop must use its WSL 2 backend with
+working GPU support ([Docker's GPU guide](https://docs.docker.com/desktop/features/gpu/)).
+Microphone transcription also needs NeMo-Speech.cpp, installed separately below.
+No Node.js, hosted LLM, or API key is required.
+
+## Try it
+
+Run these commands from the repository root in PowerShell. The initial image and
+model downloads can take a while.
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
 docker compose up -d --build
-```
-
-The first start downloads the container image and can take a few minutes. Check
-its status:
-
-```powershell
-docker compose ps
-```
-
-The default local database settings are documented in `.env.example`. To use
-your own settings, copy `.env.example` to `.env` and edit the copy before
-starting the database. Git ignores `.env`.
-
-Stop the services without deleting their data:
-
-```powershell
-docker compose down
-```
-
-Start it again with `docker compose up -d`; database data is kept in a named
-Docker volume.
-
-## Embeddings and hybrid search
-
-Download the embedding model once on each computer. Its files remain in a
-Docker volume and are not committed to Git:
-
-```powershell
 docker compose exec ollama-embeddings ollama pull qwen3-embedding:0.6b
-```
-
-After importing textbook chunks and applying all migrations, generate every
-missing embedding in DBeaver:
-
-```sql
-CALL textbook.embed_chunks();
-```
-
-The embedding service runs on the CPU so the RTX GPU remains available for the
-local LLM. Search needs only the question and desired result count:
-
-```sql
-SELECT *
-FROM textbook.search_chunks_hybrid('What is machine learning?', 5);
-```
-
-See `database/sql/embed_and_search.sql` for the two DBeaver commands.
-
-## Local LangGraph textbook assistant
-
-The answer-generating model runs in a separate GPU-enabled Ollama container so
-the private CPU-only embedding service remains isolated. Start the services and
-download the model once:
-
-```powershell
-docker compose up -d
 docker compose exec ollama-llm ollama pull qwen3.5:9b-q4_K_M
+.\.venv\Scripts\python.exe -m alembic -c .\database\alembic.ini upgrade head
+.\.venv\Scripts\python.exe .\book_scraper\ingest_book.py --max-files 1
+docker compose exec postgres psql -U textbook_rag -d textbook_rag -c "CALL textbook.embed_chunks();"
 ```
 
-For the browser chat UI, start the LangGraph server in one PowerShell window:
+That imports one sample document and embeds its chunks. The final command uses
+the default database user/name from `.env.example`; adjust it if you change those
+settings. Re-running the importer keeps unchanged documents and embeddings. To
+import more approved files, raise `--max-files` and run the embedding command again.
+
+To use another answer model, pull it into `ollama-llm` and set
+`OLLAMA_LLM_MODEL` in `.env`; it must support tool calls. The embedding model is
+fixed in the SQL and 1024-dimensional database schema. Changing it requires a
+migration and re-embedding, not just an `.env` edit.
+
+## Talk to the agent
+
+For microphone transcription, install
+[NeMo-Speech.cpp for Windows](https://github.com/NVIDIA/NeMo-Speech.cpp/blob/main/docs/install.md)
+and download its model with `nemo-speech pull nemotron-3.5`. Then start these in
+two PowerShell windows from the repository root:
 
 ```powershell
-.\.venv\Scripts\langgraph.exe dev --no-browser
-```
-
-Then start the frontend in a second PowerShell window:
-
-```powershell
-cd .\textbook-chat
-pnpm dev
-```
-
-Open `http://localhost:3000`. The frontend is preconfigured for the local graph
-named `agent` at `http://localhost:2024`; no LangSmith key is needed for this
-local chat UI. The frontend is an ignored local checkout of the official
-`langchain-ai/agent-chat-ui` repository rather than duplicated application code.
-
-On a new computer, install the frontend once:
-
-```powershell
-winget install --id OpenJS.NodeJS.LTS --exact
-npm install --global pnpm@10.5.1
-git clone https://github.com/langchain-ai/agent-chat-ui.git textbook-chat
-Copy-Item .\textbook-chat\.env.example .\textbook-chat\.env
-cd .\textbook-chat
-pnpm install
-```
-
-The LangGraph agent has exactly one tool: the database-owned
-`textbook.search_chunks_hybrid` function. It must retrieve evidence before
-answering and includes the source section and URL in its response. Configuration
-is available in `.env.example`; the default model endpoint is private to this
-computer at `127.0.0.1:11435`.
-
-## Local voice chat (Croatian and English)
-
-Voice is an input/output layer around the existing `textbook_agent.agent.build_agent()`
-graph. It does not add another LLM or another retrieval tool. The browser sends
-16 kHz microphone audio to NeMo-Speech.cpp's streaming Nemotron ASR; the final
-transcript goes to the existing LangGraph/Qwen/hybrid-search agent; Supertonic 3
-speaks the answer on CPU. The separate voice page keeps the ignored upstream
-Agent Chat UI checkout untouched. Conversation state lives in the voice page's
-WebSocket session; refreshing it starts a new conversation.
-
-One-time Windows installation:
-
-```powershell
-& ([scriptblock]::Create((curl.exe -L --silent https://raw.githubusercontent.com/NVIDIA/NeMo-Speech.cpp/main/scripts/install.ps1 | Out-String))) -Backend cuda -BinaryOnly
-& "$env:LOCALAPPDATA\Programs\NeMoSpeech\bin\nemo-speech.exe" pull nemotron-3.5
-.\.venv\Scripts\python.exe -m pip install -r requirements-voice.txt
-```
-
-Start Docker first. Then run these in two separate PowerShell windows from the
-repository root (the first command keeps the ASR model loaded):
-
-```powershell
-& "$env:LOCALAPPDATA\Programs\NeMoSpeech\bin\nemo-speech.exe" serve --asr-model nemotron-3.5 --gpu 0 --endpointing
+nemo-speech serve --asr-model nemotron-3.5 --gpu 0 --endpointing
 ```
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn voice_app.server:app --host 127.0.0.1 --port 8766
 ```
 
-Open `http://127.0.0.1:8766`, allow microphone access, choose Auto, Hrvatski,
-or English, then click **Start talking** and **Stop / send**. You can type in
-the same page, too. On first use Supertonic downloads its ONNX weights into
-the local Hugging Face cache; subsequent runs reuse them. No CUDA toolkit or
-PyTorch installation is required for this setup. If Nemotron's Croatian
-transcription is not accurate enough, its ASR is isolated behind `VOICE_ASR_WS`
-so it can be changed without changing the agent.
+Open **http://127.0.0.1:8766**. You can also type on that page without starting
+NeMo-Speech.cpp. The voice app loads the LangGraph agent directly and searches
+the English book before answering in your language. Supertonic speech weights
+download on first use. Stop the services with `Ctrl+C`.
 
-Voice source files are in `voice_app/`; `server.py` bridges ASR, agent and TTS,
-`capture.js` downsamples browser audio, and `index.html` is the local UI.
+## What installs where?
 
-## Database versions
+| File or command | Purpose |
+| --- | --- |
+| `requirements.txt` | All Python packages for importing books and voice chat. |
+| `compose.yaml` | Builds PostgreSQL and starts two Ollama services; named volumes keep database and model data across restarts. |
+| `nemo-speech pull nemotron-3.5` | Downloads the separate speech-to-text model for microphone input. |
 
-Alembic records database-structure changes in Git. Apply every migration that
-has not yet run on the current computer:
+Python's `pip` does not install Docker images, Ollama models, or NeMo-Speech.cpp.
+`.env.example` lists local settings; copy it to `.env` and keep `.env` private.
+`docker compose down` stops the containers without deleting their named volumes.
 
-```powershell
-.\.venv\Scripts\python.exe -m alembic -c .\database\alembic.ini upgrade head
-```
+## Project files and license
 
-Check the installed database version:
+- [`book_scraper/`](book_scraper/) contains source manifests and the importer.
+- [`database/`](database/) contains Docker setup, Alembic migrations, and SQL examples.
+- [`textbook_agent/`](textbook_agent/) contains the LangGraph agent and its search tool.
+- [`voice_app/`](voice_app/) contains the voice interface.
 
-```powershell
-.\.venv\Scripts\python.exe -m alembic -c .\database\alembic.ini current
-```
+The original project code is [MIT licensed](LICENSE). Downloaded books and models
+retain their own licenses; see [third-party content notes](THIRD_PARTY_CONTENT.md).
 
-The authoritative history is in `database/migrations/versions/`. The generated
-`database/sql/schema.sql` file provides the equivalent readable PostgreSQL DDL and
-must not be edited manually.
-
-## Import a licensed textbook sample
-
-The complete import workflow lives under `book_scraper/`:
-
-```text
-book_scraper/
-  ingest_book.py                 Git/Markdown importer
-  sources/                       reviewed source manifests
-  data/raw/                      downloaded Git checkouts (ignored)
-  data/processed/                reserved local intermediates (ignored)
-```
-
-In a manifest, `snapshot_directory` is relative to `book_scraper/`. The
-downloaded snapshot is local working data; the imported sections and chunks
-are stored in PostgreSQL, not in `data/processed/`.
-
-The first source is the official Git repository for *Dive into Deep Learning*,
-licensed under CC BY-SA 4.0. Import one Introduction document from the approved
-source manifest:
-
-```powershell
-.\.venv\Scripts\python.exe .\book_scraper\ingest_book.py `
-    https://github.com/d2l-ai/d2l-en `
-    --max-files 1
-```
-
-The importer records the exact Git revision and license, preserves the heading
-hierarchy, stores paragraphs/code/equations as typed blocks, and creates chunks
-that never cross section boundaries. Re-importing replaces only changed selected
-documents; unchanged documents and other documents in the same revision retain
-their embeddings. Downloaded source files remain in ignored
-`book_scraper/data/raw/` storage.
-
-New chunks have no embedding. Run `CALL textbook.embed_chunks();` after inspecting
-them; existing embeddings are retained.
+Possible next step: download a licensed evaluation dataset, embed it, and
+compare this small local model with popular hosted API models on the same
+questions and evidence. Use an LLM judge for answer quality, while measuring
+retrieval accuracy separately so search failures are not blamed on the model.
