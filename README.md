@@ -1,4 +1,4 @@
-# Open Textbook RAG
+# Voice book RAG
 
 A local study assistant that answers questions using passages from an open textbook.
 It imports approved Git-hosted Markdown books into PostgreSQL, combines keyword and
