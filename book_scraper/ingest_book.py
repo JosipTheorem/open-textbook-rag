@@ -454,12 +454,12 @@ def store_documents(
     target_words: int,
     overlap_words: int,
 ) -> dict[str, int]:
-    """Replace one exact source revision with a deterministic structured import."""
+    """Replace selected documents without deleting others in the same revision."""
     run_id = uuid4()
     aggregate_hash = hashlib.sha256(
         "".join(document.content_hash for document in documents).encode("ascii")
     ).hexdigest()
-    totals = {"documents": 0, "sections": 0, "blocks": 0, "chunks": 0}
+    totals = {"documents": 0, "sections": 0, "blocks": 0, "chunks": 0, "unchanged": 0}
 
     with connect(_database_dsn(database_url), autocommit=True, row_factory=dict_row) as conn:
         conn.execute(
@@ -473,32 +473,89 @@ def store_documents(
         try:
             with conn.transaction():
                 book_id = _insert_book(conn, manifest)
-                conn.execute(
-                    "DELETE FROM textbook.editions WHERE book_id = %s AND source_revision = %s",
-                    (book_id, revision),
-                )
-                edition_id = uuid4()
-                conn.execute(
+                edition = conn.execute(
                     """
                     INSERT INTO textbook.editions (
                         id, book_id, source_type, source_url, source_revision, content_hash
                     ) VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (book_id, source_revision) DO UPDATE SET
+                        source_type = EXCLUDED.source_type,
+                        source_url = EXCLUDED.source_url
+                    RETURNING id
                     """,
                     (
-                        edition_id,
+                        uuid4(),
                         book_id,
                         manifest["source_type"],
                         manifest["source_url"],
                         revision,
                         aggregate_hash,
                     ),
-                )
+                ).fetchone()
+                assert edition is not None
+                edition_id = edition["id"]
 
-                for document_ordinal, document in enumerate(documents, start=1):
-                    document_id = uuid4()
+                for document in documents:
                     source_url, canonical_url = _source_urls(
                         manifest, revision, document.source_path
                     )
+                    section_chunks = [
+                        chunk_section(section, target_words, overlap_words)
+                        for section in document.sections
+                    ]
+                    expected_chunk_hashes = [
+                        hashlib.sha256(chunk.text.encode("utf-8")).hexdigest()
+                        for chunks in section_chunks
+                        for chunk in chunks
+                    ]
+                    existing = conn.execute(
+                        """
+                        SELECT id, ordinal, content_hash, source_url, canonical_url, title
+                        FROM textbook.source_documents
+                        WHERE edition_id = %s AND source_path = %s
+                        """,
+                        (edition_id, document.source_path),
+                    ).fetchone()
+                    if existing is not None and (
+                        existing["content_hash"] == document.content_hash
+                        and existing["source_url"] == source_url
+                        and existing["canonical_url"] == canonical_url
+                        and existing["title"] == document.title
+                    ):
+                        stored_chunk_hashes = conn.execute(
+                            """
+                            SELECT c.content_hash
+                            FROM textbook.chunks AS c
+                            JOIN textbook.sections AS s ON s.id = c.section_id
+                            WHERE s.document_id = %s
+                            ORDER BY s.ordinal, c.chunk_index
+                            """,
+                            (existing["id"],),
+                        ).fetchall()
+                        if [row["content_hash"] for row in stored_chunk_hashes] == expected_chunk_hashes:
+                            totals["unchanged"] += 1
+                            continue
+                    if existing is None:
+                        next_ordinal = conn.execute(
+                            """
+                            SELECT COALESCE(MAX(ordinal), 0) + 1 AS ordinal
+                            FROM textbook.source_documents
+                            WHERE edition_id = %s
+                            """,
+                            (edition_id,),
+                        ).fetchone()
+                        assert next_ordinal is not None
+                        document_ordinal = next_ordinal["ordinal"]
+                    else:
+                        document_ordinal = existing["ordinal"]
+                        conn.execute(
+                            """
+                            DELETE FROM textbook.source_documents
+                            WHERE edition_id = %s AND source_path = %s
+                            """,
+                            (edition_id, document.source_path),
+                        )
+                    document_id = uuid4()
                     conn.execute(
                         """
                         INSERT INTO textbook.source_documents (
@@ -520,7 +577,9 @@ def store_documents(
                     totals["documents"] += 1
                     parents: dict[int, UUID] = {}
 
-                    for section_ordinal, section in enumerate(document.sections, start=1):
+                    for section_ordinal, (section, chunks) in enumerate(
+                        zip(document.sections, section_chunks, strict=True), start=1
+                    ):
                         parent_levels = [level for level in parents if level < section.level]
                         parent_id = parents[max(parent_levels)] if parent_levels else None
                         for level in [level for level in parents if level >= section.level]:
@@ -563,9 +622,7 @@ def store_documents(
                             )
                             totals["blocks"] += 1
 
-                        for chunk_index, chunk in enumerate(
-                            chunk_section(section, target_words, overlap_words)
-                        ):
+                        for chunk_index, chunk in enumerate(chunks):
                             conn.execute(
                                 """
                                 INSERT INTO textbook.chunks (
@@ -586,6 +643,23 @@ def store_documents(
                                 ),
                             )
                             totals["chunks"] += 1
+
+                hashes = conn.execute(
+                    """
+                    SELECT content_hash
+                    FROM textbook.source_documents
+                    WHERE edition_id = %s
+                    ORDER BY source_path
+                    """,
+                    (edition_id,),
+                ).fetchall()
+                edition_hash = hashlib.sha256(
+                    "".join(row["content_hash"] for row in hashes).encode("ascii")
+                ).hexdigest()
+                conn.execute(
+                    "UPDATE textbook.editions SET content_hash = %s WHERE id = %s",
+                    (edition_hash, edition_id),
+                )
 
                 conn.execute(
                     """
@@ -662,7 +736,9 @@ def main() -> int:
         f"{totals['blocks']} blocks, "
         f"{totals['chunks']} chunks"
     )
-    print("Embeddings: not generated yet")
+    print(f"Unchanged documents retained: {totals['unchanged']}")
+    if totals["chunks"]:
+        print("New chunks need embeddings: CALL textbook.embed_chunks();")
     return 0
 
 

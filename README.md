@@ -192,26 +192,10 @@ source manifest:
 
 The importer records the exact Git revision and license, preserves the heading
 hierarchy, stores paragraphs/code/equations as typed blocks, and creates chunks
-that never cross section boundaries. Re-running the same revision replaces its
-structured content instead of duplicating it. Downloaded source files remain in
-ignored `book_scraper/data/raw/` storage.
+that never cross section boundaries. Re-importing replaces only changed selected
+documents; unchanged documents and other documents in the same revision retain
+their embeddings. Downloaded source files remain in ignored
+`book_scraper/data/raw/` storage.
 
-This stage deliberately leaves `textbook.chunks.embedding` empty. Run
-`CALL textbook.embed_chunks();` after inspecting the imported chunks.
-
-## Project board
-
-Run the local visual project board from the repository root:
-
-```powershell
-.\.venv\Scripts\python.exe .\project_board\run_board.py
-```
-
-The board opens automatically at:
-
-```text
-http://127.0.0.1:8765/project_board/
-```
-
-Task changes are saved to `project_board/tasks.json`, so they can be committed
-and synchronized through Git. Stop the server with `Ctrl+C`.
+New chunks have no embedding. Run `CALL textbook.embed_chunks();` after inspecting
+them; existing embeddings are retained.

@@ -74,7 +74,7 @@ def hybrid_search(
 def search_textbook(
     query: Annotated[
         str,
-        Field(description="A focused semantic search query for the textbook."),
+        Field(description="English-only textbook search query; translate Croatian questions first."),
     ],
     limit: Annotated[
         int,

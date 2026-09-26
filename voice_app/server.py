@@ -42,7 +42,15 @@ def _get_tts() -> TTS:
 def _speak(text: str, language: str) -> bytes:
     tts = _get_tts()
     style = tts.get_voice_style("M1")
-    audio, _ = tts.synthesize(text, voice_style=style, lang=language)
+    audio, _ = tts.synthesize(
+        text,
+        voice_style=style,
+        lang=language,
+        total_steps=5,
+        speed=1.15,
+        max_chunk_length=300,
+        silence_duration=0.1,
+    )
     samples = np.asarray(audio).reshape(-1)
     pcm = (np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes()
     buffer = io.BytesIO()
@@ -54,13 +62,37 @@ def _speak(text: str, language: str) -> bytes:
     return buffer.getvalue()
 
 
-def _phrases(text: str) -> list[str]:
-    # A long answer is voiced in small units, so playback can begin early.
-    text = re.split(r"\n\s*(?:#+\s*)?Sources\b", text, maxsplit=1, flags=re.IGNORECASE)[0]
+def _speech_chunks(text: str, max_length: int = 300) -> list[str]:
+    """Speak the first sentence promptly, then batch the rest without truncation."""
+    text = re.split(
+        r"\n\s*(?:#+\s*)?(?:Sources|Izvori)\b",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
     text = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", text)
     text = re.sub(r"[`*_#]", "", text)
-    pieces = re.split(r"(?<=[.!?;:])\s+", text.strip())
-    return [piece for piece in pieces if piece.strip()][:30]
+    sentences = re.split(r"(?<=[.!?;:])\s+", text.strip())
+    pieces: list[str] = []
+    for sentence in sentences:
+        current = ""
+        for word in sentence.split():
+            if current and len(current) + len(word) + 1 > max_length:
+                pieces.append(current)
+                current = ""
+            current = f"{current} {word}".strip()
+        if current:
+            pieces.append(current)
+
+    if not pieces:
+        return []
+    chunks = [pieces[0]]
+    for piece in pieces[1:]:
+        if len(chunks[-1]) + len(piece) + 1 <= max_length and len(chunks) > 1:
+            chunks[-1] += f" {piece}"
+        else:
+            chunks.append(piece)
+    return chunks
 
 
 @app.get("/")
@@ -118,8 +150,8 @@ async def voice_socket(browser: WebSocket) -> None:
             if language == "auto":
                 speech_language = "hr" if re.search(r"[čćđšžČĆĐŠŽ]", reply) else "en"
             async with _tts_lock:
-                for phrase in _phrases(reply):
-                    sound = await asyncio.to_thread(_speak, phrase, speech_language)
+                for chunk in _speech_chunks(reply):
+                    sound = await asyncio.to_thread(_speak, chunk, speech_language)
                     await emit({"type": "audio", "data": base64.b64encode(sound).decode("ascii")})
             await emit({"type": "done"})
         except asyncio.CancelledError:
